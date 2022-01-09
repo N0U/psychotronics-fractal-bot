@@ -20,7 +20,7 @@
   "dependencies": {
     "dotenv": "^10.0.0",
     "markdown-escape": "^1.1.0",
-    "sqlite3": "^5.0.2",
+    "pg": "^8.7.1",
     "telegraf": "^4.5.2"
   }
 }

@@ -4,6 +4,11 @@ const fs = require('fs');
 const { Telegraf, Telegram, Markup } = require('telegraf');
 const markdownEscape = require('markdown-escape');
 
+const { Pool } = require('pg');
+const db = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
 const bot = new Telegraf(process.env.TOKEN);
 bot.telegram.setMyCommands([
   { command: 'help', description: 'Справка' },
@@ -12,56 +17,57 @@ bot.telegram.setMyCommands([
   { command: 'tinfo', description: 'Техническая инфа' },
 ]);
 
-const sqlite3 = require('sqlite3');
-const db = new sqlite3.Database(process.env.DB_PATH);
-
 const Social = require('./social/social');
 
 const social = new Social(db);
-/*
-for(let i = 1; i <= 20; i++)
-  social.addUser(i, `n${i}`);
-*/
+
 async function testDb() {
+
   for(let i = 1; i <= 20; i++)
-    social.addUser(i, `n${i}`);
+    await social.addUser(i, `n${i}`);
+
+  for(let i = 1; i <= 20; i++)
+    await social.addUser(i, `n${i}`);
 
   for(let i = 2; i <= 5; i++)
-    social.like(1, i);
+    await social.like(1, i);
 
   for(let i = 8; i <= 15; i++)
-    social.like(1, i);
+    await social.like(1, i);
 
   for(let i = 2; i <= 9; i++)
-    social.like(i, 1);
+    await social.like(i, 1);
 
   for(let i = 1; i <= 10; i++)
-    social.like(i, i + 5);
+    await social.like(i, i + 5);
 
-  social.like(5, 3);
-  social.like(5, 2);
+  await social.like(5, 3);
+  await social.like(5, 2);
   console.log(await social.getRecivers(1));
-  console.log(await social.getRecivers(2));
+//  console.log(await social.getRecivers(2));
   console.log(await social.listUserFavor(1));
   console.log(await social.listFavoredByUser(1));
 }
 //Promise.all([testDb()]);
-
 
 function isPrivateChat(chat) {
     return chat.type === 'private';
 }
 
 bot.start(async (ctx) => {
-  const { message: { from, chat } } = ctx.update;
-  if(from.is_bot || !isPrivateChat(chat))
-    return;
+  try {
+    const { message: { from, chat } } = ctx.update;
+    if(from.is_bot || !isPrivateChat(chat))
+      return;
 
-  social.addUser(from.id, from.username);
-  await ctx.reply(
-    `Привет ${from.username}\r\n` +
-    `Тыкай /help для справки`
-  );
+    social.addUser(from.id, from.username);
+    await ctx.reply(
+      `Привет ${from.username}\r\n` +
+      `Тыкай /help для справки`
+    );
+  } catch(ex) {
+    console.trace(ex);
+  }
 });
 
 const helpText = fs.readFileSync('info/help', 'utf8');
@@ -91,55 +97,63 @@ bot.command('test', async (ctx) => {
 });
 */
 bot.on('callback_query', async (ctx) => {
-  const { callback_query: { from, message, data }} = ctx.update;
-  console.log(`${from.username} gives favor to ${data}`);
-  await ctx.editMessageReplyMarkup();
-  const id = parseInt(data);
-  if(id > 0){
-    social.like(id, from.id);
-  } else {
-    social.dislike(-id, from.id);
+  try {
+    const { callback_query: { from, message, data }} = ctx.update;
+    console.log(`${from.username} gives favor to ${data}`);
+    await ctx.editMessageReplyMarkup();
+    const id = parseInt(data);
+    if(id > 0){
+      social.like(id, from.id);
+    } else {
+      social.dislike(-id, from.id);
+    }
+  } catch(ex) {
+    console.trace(ex);
   }
 });
 
 bot.on('text', async (ctx) => {
-  const tg = ctx.telegram;
-  const { message: { text, message_id, from, chat }} = ctx.update;
-  if(from.is_bot || !isPrivateChat(chat))
-    return;
+  try {
+    const tg = ctx.telegram;
+    const { message: { text, message_id, from, chat }} = ctx.update;
+    if(from.is_bot || !isPrivateChat(chat))
+      return;
 
-  let recivers;
-  if(text.startsWith('!!!'))
-    recivers = await social.whoUserShoutsTo(from.id);
-  else if(text.startsWith('***') || text.startsWith('@@@'))
-    recivers = await social.whoUserWhispersTo(from.id);
-  else
-    recivers = await social.whoUserTalksTo(from.id);
+    const users = await social.getUser(from.id, from.username);
+    let recivers;
+    if(text.startsWith('!!!'))
+      recivers = await social.whoUserShoutsTo(from.id);
+    else if(text.startsWith('***') || text.startsWith('@@@'))
+      recivers = await social.whoUserWhispersTo(from.id);
+    else
+      recivers = await social.whoUserTalksTo(from.id);
 
-  const promises = [];
+    const promises = [];
 
-  const reply_markup = Markup.inlineKeyboard([
-      Markup.button.callback('+', from.id),
-      Markup.button.callback('-', -from.id),
-    ]).reply_markup;
+    const reply_markup = Markup.inlineKeyboard([
+        Markup.button.callback('+', from.id),
+        Markup.button.callback('-', -from.id),
+      ]).reply_markup;
 
-  const copyMsg = async (id) => {
-    try {
-      const msgId = ctx.copyMessage(id, { reply_markup: reply_markup });
-      return { msgId, toId: id };
-    } catch(err) {
-      console.error(err);
-      social.deleteUser(id);
-      throw err;
+    const copyMsg = async (id) => {
+      try {
+        const msgId = await ctx.copyMessage(id, { reply_markup: reply_markup });
+        return { msgId, toId: id };
+      } catch(err) {
+        console.warn(`Delete user ${id} coz' bot has no access to him`);
+        await social.deleteUser(id);
+        throw err;
+      }
+    };
+
+    for(const id of recivers) {
+      promises.push(copyMsg(id));
     }
-  };
 
-  for(const id of recivers) {
-    promises.push(copyMsg(id));
+    const results = await Promise.allSettled(promises);
+  } catch(ex){
+    console.trace(ex);
   }
-
-  const results = await Promise.allSettled(promises);
-  const ids = results.filter(p => p.status === 'fulfilled').map(p => p.value);
 });
 
 if(process.env.PROD) {
@@ -156,7 +170,7 @@ if(process.env.PROD) {
 }
 
 function onClose() {
-  db.close();
+  db.end().then(() => console.log('pool has ended'));
 }
 // Enable graceful stop
 process.once('SIGINT', () => {

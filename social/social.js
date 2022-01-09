@@ -14,58 +14,68 @@ const { execAll } = require('../utils.js');
 class Social {
   constructor(db) {
     this.db = db;
-    this.db.run('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT NOT NULL)');
-    this.db.run('CREATE TABLE IF NOT EXISTS favor (fromID INTEGER NOT NULL, toId INTEGER NOT NULL, score INTEGER NOT NULL DEFAULT 0, UNIQUE (fromId, toId))');
   }
 
-  addUser(id, name) {
-    this.db.run(`INSERT OR IGNORE INTO users VALUES(?, ?)`, id, name);
+  async addUser(id, name) {
+    await this.db.query('INSERT INTO users VALUES($1, $2) ON CONFLICT DO NOTHING', [id, name]);
   }
 
-  deleteUser(id) {
-    this.db.run('DELETE FROM users WHERE id = ?', id);
+  async getUserIfExist(id) {
+    const result = await this.db.query('SELECT * FROM users WHERE id = $1', [id]);
+    return result.rows[0];
   }
 
-  giveFavor(toId, fromId, score) {
-    this.db.run(
-      `INSERT INTO favor (fromId, toId, score) VALUES(?, ?, ?)
-        ON CONFLICT (fromId, toId) DO UPDATE SET score = score + excluded.score`,
-      toId, fromId, score);
+  async getUser(id, name) {
+    let user = await this.getUserIfExist(id);
+    console.log(user);
+    if(!!user) {
+      await this.addUser(id, name);
+      user = await this.getUserIfExist(id);;
+    }
+    return user;
   }
 
-  like(toId, fromId) {
-    this.giveFavor(toId, fromId, FAVOR_STEP);
+  async deleteUser(id) {
+    console.log(await this.db.query('DELETE FROM users WHERE id = $1', [id]));
   }
 
-  dislike(toId, fromId) {
-    this.giveFavor(toId, fromId, -FAVOR_STEP);
+  async giveFavor(toId, fromId, score) {
+    await this.db.query(
+      `INSERT INTO favor (fromId, toId, score) VALUES($1, $2, $3)
+        ON CONFLICT ON CONSTRAINT pk DO UPDATE SET score = favor.score + excluded.score`,
+      [fromId, toId, score]);
+  }
+
+  async like(toId, fromId) {
+    await this.giveFavor(toId, fromId, FAVOR_STEP);
+  }
+
+  async dislike(toId, fromId) {
+    await this.giveFavor(toId, fromId, -FAVOR_STEP);
   }
 
   async listUserFavor(id) {
-    return await execAll(
-      this.db,
-      'SELECT * FROM favor WHERE toId = ?',
+    return (await this.db.query(
+      'SELECT * FROM favor WHERE toId = $1',
       [id],
-    );
+    )).rows;
   }
 
   async listFavoredByUser(id) {
-    return await execAll(
-      this.db,
-      'SELECT * FROM favor WHERE fromId = ?',
+    return (await this.db.query(
+      'SELECT * FROM favor WHERE fromId = $1',
       [id],
-    );
+    )).rows;
   }
 
   async getRecivers(id, threshold = NORMAL_THRESHOLD) {
-    const rows = await execAll(
-      this.db,
+    const result = await this.db.query(
       `SELECT u.id as id FROM users as u
-        LEFT JOIN favor as f ON f.fromId = u.id AND f.toId = ?1
-      WHERE id != ?1 AND ifnull(f.score, 0) > ?`,
+        LEFT JOIN favor as f ON f.fromId = u.id AND f.toId = $1
+      WHERE id != $1 AND COALESCE(f.score, 0) > $2`,
         [id, threshold]
     );
-    return rows.map(q => q.id);
+    return result.rows.map(q => q.id);
   }
 
   async whoUserWhispersTo(id) {

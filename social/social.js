@@ -58,7 +58,6 @@ class Social {
   }
 
   async getRecivers(id, threshold = NORMAL_THRESHOLD) {
-    console.log('THD ' + threshold);
     const rows = await execAll(
       this.db,
       `SELECT u.id as id FROM users as u

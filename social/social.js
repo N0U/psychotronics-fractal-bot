@@ -1,5 +1,9 @@
 const DEFAULT_FAVOR = 0;
 const FAVOR_STEP = 1;
+const WHISPER_THRESHOLD = 10;
+const NORMAL_THRESHOLD = -10;
+const SHOUT_THRESHOLD = -30;
+
 const { execAll } = require('../utils.js');
 //
 // toId
@@ -52,7 +56,8 @@ class Social {
     );
   }
 
-  async getRecivers(id, threshold = -30) {
+  async getRecivers(id, threshold = NORMAL_THRESHOLD) {
+    console.log('THD ' + threshold);
     const rows = await execAll(
       this.db,
       `SELECT u.id as id FROM users as u
@@ -61,6 +66,18 @@ class Social {
         [id, threshold]
     );
     return rows.map(q => q.id);
+  }
+
+  async whoUserWhispersTo(id) {
+    return await this.getRecivers(id, WHISPER_THRESHOLD);
+  }
+
+  async whoUserTalksTo(id) {
+    return await this.getRecivers(id, NORMAL_THRESHOLD);
+  }
+
+  async whoUserShoutsTo(id) {
+    return await this.getRecivers(id, SHOUT_THRESHOLD);
   }
 }
 

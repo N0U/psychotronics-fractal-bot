@@ -74,7 +74,7 @@ bot.command('fullhelp', async (ctx) => {
 bot.command('version', async (ctx) => {
   await ctx.reply(version);
 });
-
+/*
 bot.command('test', async (ctx) => {
   const { message: { from, chat } } = ctx.update;
   const reply_markup = Markup.inlineKeyboard([
@@ -83,7 +83,7 @@ bot.command('test', async (ctx) => {
     ]).reply_markup;
   await ctx.reply('test', { reply_markup: reply_markup });
 });
-
+*/
 bot.on('callback_query', async (ctx) => {
   const { callback_query: { from, message, data }} = ctx.update;
   console.log(`${from.username} gives favor to ${data}`);
@@ -98,11 +98,18 @@ bot.on('callback_query', async (ctx) => {
 
 bot.on('text', async (ctx) => {
   const tg = ctx.telegram;
-  const { message: { message_id, from, chat }} = ctx.update;
+  const { message: { text, message_id, from, chat }} = ctx.update;
   if(from.is_bot || !isPrivateChat(chat))
     return;
 
-  const recivers = await social.getRecivers(from.id);
+  let recivers;
+  if(text.startsWith('!!!'))
+    recivers = await social.whoUserShoutsTo(from.id);
+  else if(text.startsWith('***') || text.startsWith('@@@'))
+    recivers = await social.whoUserWhispersTo(from.id);
+  else
+    recivers = await social.whoUserTalksTo(from.id);
+
   const promises = [];
 
   const reply_markup = Markup.inlineKeyboard([

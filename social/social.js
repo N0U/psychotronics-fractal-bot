@@ -1,6 +1,6 @@
 const DEFAULT_FAVOR = 0;
 const FAVOR_STEP = 1;
-const THRESHOLDS =  process.env.SAY_THRESHOLDS.split(':').map(x => parseInt(x));
+const THRESHOLDS =  process.env.TALK_THRESHOLDS.split(':').map(x => parseInt(x));
 const WHISPER_THRESHOLD = THRESHOLDS[0];
 const NORMAL_THRESHOLD = THRESHOLDS[1];
 const SHOUT_THRESHOLD = THRESHOLDS[2];

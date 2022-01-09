@@ -1,17 +1,6 @@
 const DEFAULT_FAVOR = 0;
-const FAVOR_STEP = 5;
-
-function execAll(db, query, params) {
-  return new Promise((resolve,reject) => {
-    db.all(query, params, (err, rows) => {
-      if(!!err) {
-        reject(err);
-      } else {
-        resolve(rows);
-      }
-    });
-  });
-}
+const FAVOR_STEP = 1;
+const { execAll } = require('../utils.js');
 //
 // toId
 // fromId
@@ -26,6 +15,10 @@ class Social {
 
   addUser(id, name) {
     this.db.run(`INSERT OR IGNORE INTO users VALUES(?, ?)`, id, name);
+  }
+
+  deleteUser(id) {
+    this.db.run('DELETE FROM users WHERE id = ?', id);
   }
 
   giveFavor(toId, fromId, score) {
@@ -59,7 +52,7 @@ class Social {
     );
   }
 
-  async getRecivers(id, threshold = -20) {
+  async getRecivers(id, threshold = -30) {
     const rows = await execAll(
       this.db,
       `SELECT u.id as id FROM users as u

@@ -1,7 +1,13 @@
+require('dotenv').config();
+
 const { Telegraf, Telegram, Markup } = require('telegraf');
 const markdownEscape = require('markdown-escape');
 
 const bot = new Telegraf(process.env.TOKEN);
+bot.telegram.setMyCommands([
+  { command: 'like', description: 'Лойс' },
+  { command: 'dislike', description: 'Нелойс' },
+]);
 
 const sqlite3 = require('sqlite3');
 const db = new sqlite3.Database('.data/data.db');
@@ -10,6 +16,9 @@ const Social = require('./social/social');
 
 const social = new Social(db);
 /*
+for(let i = 1; i <= 20; i++)
+  social.addUser(i, `n${i}`);
+*/
 async function testDb() {
   for(let i = 1; i <= 20; i++)
     social.addUser(i, `n${i}`);
@@ -33,13 +42,74 @@ async function testDb() {
   console.log(await social.listUserFavor(1));
   console.log(await social.listFavoredByUser(1));
 }
-Promise.all([testDb()]);
-*/
+//Promise.all([testDb()]);
 
-bot.start((ctx) => ctx.reply('Привет'));
+
+function isPrivateChat(chat) {
+    return chat.type === 'private';
+}
+
+bot.start(async (ctx) => {
+  const { message: { from, chat } } = ctx.update;
+  if(from.is_bot || !isPrivateChat(chat))
+    return;
+
+  social.addUser(from.id, from.username);
+  await ctx.reply(`Привет ${from.username}`);
+});
+
+bot.command('test', async (ctx) => {
+  const { message: { from, chat } } = ctx.update;
+  const reply_markup = Markup.inlineKeyboard([
+      Markup.button.callback('+', from.id),
+      Markup.button.callback('-', -from.id),
+    ]).reply_markup;
+  await ctx.reply('test', { reply_markup: reply_markup });
+});
+
+bot.on('callback_query', async (ctx) => {
+  const { callback_query: { from, message, data }} = ctx.update;
+  console.log(`${from.username} gives favor to ${data}`);
+  await ctx.editMessageReplyMarkup();
+  const id = parseInt(data);
+  if(id > 0){
+    social.like(id, from.id);
+  } else {
+    social.dislike(-id, from.id);
+  }
+});
 
 bot.on('text', async (ctx) => {
-  const { message } = ctx.update;
+  const tg = ctx.telegram;
+  const { message: { message_id, from, chat }} = ctx.update;
+  if(from.is_bot || !isPrivateChat(chat))
+    return;
+
+  const recivers = await social.getRecivers(from.id);
+  const promises = [];
+
+  const reply_markup = Markup.inlineKeyboard([
+      Markup.button.callback('+', from.id),
+      Markup.button.callback('-', -from.id),
+    ]).reply_markup;
+
+  const copyMsg = async (id) => {
+    try {
+      const msgId = ctx.copyMessage(id, { reply_markup: reply_markup });
+      return { msgId, toId: id };
+    } catch(err) {
+      console.error(err);
+      social.deleteUser(id);
+      throw err;
+    }
+  };
+
+  for(const id of recivers) {
+    promises.push(copyMsg(id));
+  }
+
+  const results = await Promise.allSettled(promises);
+  const ids = results.filter(p => p.status === 'fulfilled').map(p => p.value);
 });
 
 if(process.env.PROD) {

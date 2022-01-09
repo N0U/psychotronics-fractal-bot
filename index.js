@@ -6,8 +6,10 @@ const markdownEscape = require('markdown-escape');
 
 const bot = new Telegraf(process.env.TOKEN);
 bot.telegram.setMyCommands([
-  { command: 'like', description: 'Лойс' },
-  { command: 'dislike', description: 'Нелойс' },
+  { command: 'help', description: 'Справка' },
+  { command: 'fullhelp', description: 'Текстота умная' },
+  { command: 'version', description: 'Ченджлог' },
+  { command: 'tinfo', description: 'Техническая инфа' },
 ]);
 
 const sqlite3 = require('sqlite3');
@@ -73,6 +75,10 @@ bot.command('fullhelp', async (ctx) => {
 });
 bot.command('version', async (ctx) => {
   await ctx.reply(version);
+});
+
+bot.command('tinfo', async (ctx) => {
+  await ctx.reply(`TALK_THRESHOLDS: ${process.env.TALK_THRESHOLDS}`);
 });
 /*
 bot.command('test', async (ctx) => {

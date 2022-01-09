@@ -10,7 +10,7 @@ bot.telegram.setMyCommands([
 ]);
 
 const sqlite3 = require('sqlite3');
-const db = new sqlite3.Database('.data/data.db');
+const db = new sqlite3.Database(process.env.DB_PATH);
 
 const Social = require('./social/social');
 

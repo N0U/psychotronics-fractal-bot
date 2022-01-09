@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+const fs = require('fs');
 const { Telegraf, Telegram, Markup } = require('telegraf');
 const markdownEscape = require('markdown-escape');
 
@@ -55,7 +56,23 @@ bot.start(async (ctx) => {
     return;
 
   social.addUser(from.id, from.username);
-  await ctx.reply(`Привет ${from.username}`);
+  await ctx.reply(
+    `Привет ${from.username}\r\n` +
+    `Тыкай /help для справки`
+  );
+});
+
+const helpText = fs.readFileSync('info/help', 'utf8');
+const fullHelpText = fs.readFileSync('info/fullhelp', 'utf8');
+const version = fs.readFileSync('info/version', 'utf8');
+bot.help(async (ctx) => {
+  await ctx.reply(helpText);
+});
+bot.command('fullhelp', async (ctx) => {
+  await ctx.reply(fullHelpText);
+});
+bot.command('version', async (ctx) => {
+  await ctx.reply(version);
 });
 
 bot.command('test', async (ctx) => {

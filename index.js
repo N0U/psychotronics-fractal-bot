@@ -49,6 +49,7 @@ async function testDb() {
   console.log(await social.listFavoredByUser(1));
 }
 //Promise.all([testDb()]);
+social.getUser(100, 'aaa').then(r => console.log(r)).catch(e => console.error(e));
 
 function isPrivateChat(chat) {
     return chat.type === 'private';
@@ -152,7 +153,8 @@ bot.on('text', async (ctx) => {
 
     const results = await Promise.allSettled(promises);
   } catch(ex){
-    console.trace(ex);
+    console.trace();
+    console.error(ex);
   }
 });
 

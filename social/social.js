@@ -27,10 +27,10 @@ class Social {
 
   async getUser(id, name) {
     let user = await this.getUserIfExist(id);
-    console.log(user);
-    if(!!user) {
+    if(!user) {
+      console.log(`Creating user ${id} ${name}`);
       await this.addUser(id, name);
-      user = await this.getUserIfExist(id);;
+      user = await this.getUserIfExist(id);
     }
     return user;
   }

@@ -36,7 +36,9 @@ class Social {
   }
 
   async deleteUser(id) {
-    console.log(await this.db.query('DELETE FROM users WHERE id = $1', [id]));
+    // Dont delete users on test
+    if(process.env.PROD)
+      console.log(await this.db.query('DELETE FROM users WHERE id = $1', [id]));
   }
 
   async giveFavor(toId, fromId, score) {

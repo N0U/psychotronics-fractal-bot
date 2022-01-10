@@ -49,7 +49,6 @@ async function testDb() {
   console.log(await social.listFavoredByUser(1));
 }
 //Promise.all([testDb()]);
-social.getUser(100, 'aaa').then(r => console.log(r)).catch(e => console.error(e));
 
 function isPrivateChat(chat) {
     return chat.type === 'private';
@@ -87,26 +86,30 @@ bot.command('version', async (ctx) => {
 bot.command('tinfo', async (ctx) => {
   await ctx.reply(`TALK_THRESHOLDS: ${process.env.TALK_THRESHOLDS}`);
 });
-/*
-bot.command('test', async (ctx) => {
-  const { message: { from, chat } } = ctx.update;
-  const reply_markup = Markup.inlineKeyboard([
-      Markup.button.callback('+', from.id),
-      Markup.button.callback('-', -from.id),
-    ]).reply_markup;
-  await ctx.reply('test', { reply_markup: reply_markup });
-});
-*/
+
+if(!process.env.PROD) {
+  bot.command('test', async (ctx) => {
+    const { message: { from, chat } } = ctx.update;
+    // Send message as fake user
+    const reply_markup = Markup.inlineKeyboard([
+        Markup.button.callback('+', 1),
+        Markup.button.callback('-', -1),
+      ]).reply_markup;
+    await ctx.reply('test', { reply_markup: reply_markup });
+  });
+}
+
 bot.on('callback_query', async (ctx) => {
   try {
     const { callback_query: { from, message, data }} = ctx.update;
     console.log(`${from.username} gives favor to ${data}`);
-    await ctx.editMessageReplyMarkup();
     const id = parseInt(data);
     if(id > 0){
       social.like(id, from.id);
+      await ctx.editMessageReplyMarkup();
     } else {
       social.dislike(-id, from.id);
+      await ctx.deleteMessage();
     }
   } catch(ex) {
     console.trace(ex);
